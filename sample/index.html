@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MANU 다운로드</title>
+    <title>MANU 샘플</title>
     <meta
       name="description"
-      content="MANU v0.9 UTAU 음원을 다운로드할 수 있는 페이지입니다."
+      content="MANU UTAU 음원의 목소리 샘플을 확인할 수 있는 페이지입니다."
     >
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23187c83'/%3E%3Cpath d='M20 41V19h7v8h10v-8h7v22h-7v-8H27v8z' fill='white'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="../styles.css?v=20260525-header">
@@ -15,30 +15,24 @@
     <header class="site-header">
       <nav class="site-nav" aria-label="주요 메뉴">
         <a href="../">메인</a>
-        <a href="../sample/">샘플</a>
-        <a href="../download/" aria-current="page">다운로드</a>
+        <a href="../sample/" aria-current="page">샘플</a>
+        <a href="../download/">다운로드</a>
         <a href="../terms/">약관</a>
         <a href="#contact">문의</a>
       </nav>
     </header>
 
     <main id="top">
-      <section class="section download-band page-section" id="download" aria-labelledby="download-title">
+      <section class="section two-column page-section" id="demo" aria-labelledby="demo-title">
         <div>
-          <p class="eyebrow">Download</p>
-          <h1 id="download-title">다운로드</h1>
-          <p>
-            MANU v0.9는 VCV 방식으로 녹음한 일본어 전용 UTAU 음원입니다.
-            이용 약관을 확인한 뒤 음원을 다운로드해 주세요.
+          <p class="eyebrow">Demo</p>
+          <h1 id="demo-title">목소리 미리 듣기</h1>
+          <p class="section-copy">
+            MANU는 VCV 방식으로 녹음한 일본어 전용 음원입니다. 여러 샘플을 추가해 음색과 표현 범위를 확인할 수 있습니다.
           </p>
         </div>
-        <div class="download-actions download-list-panel">
-          <div class="download-toolbar">
-            <a class="button secondary" href="../terms/">이용 약관 보기</a>
-            <a class="button ghost dark" href="../sample/">샘플 듣기</a>
-          </div>
-          <p class="download-gate" id="downloadGateStatus" role="status" aria-live="polite"></p>
-          <div class="download-list" id="downloadList" aria-label="MANU 다운로드 파일 목록"></div>
+        <div>
+          <div class="sample-list" id="sampleList" aria-live="polite"></div>
         </div>
       </section>
     </main>
@@ -55,7 +49,7 @@
       </address>
     </footer>
 
-    <script src="../download-data.js?v=20260525-downloads"></script>
-    <script src="../script.js?v=20260525-downloads"></script>
+    <script src="../sample-data.js"></script>
+    <script src="../script.js?v=20260525-filecheck"></script>
   </body>
 </html>

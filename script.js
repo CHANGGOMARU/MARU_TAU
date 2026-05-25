@@ -2,11 +2,12 @@ const copyButton = document.querySelector("#copyCredit");
 const creditText = document.querySelector("#creditText");
 const copyStatus = document.querySelector("#copyStatus");
 const sampleStorageKey = "manuSamplesDraft";
-const termsStorageKey = "manuTermsVisited";
+const downloadStorageKey = "manuDownloadsDraft";
+const termsStorageKey = "manuTermsAcceptedRelease";
 
 const hasVisitedTerms = () => {
   try {
-    return localStorage.getItem(termsStorageKey) === "true";
+    return localStorage.getItem(termsStorageKey) === getLatestDownloadKey();
   } catch {
     return false;
   }
@@ -14,7 +15,7 @@ const hasVisitedTerms = () => {
 
 const markTermsVisited = () => {
   try {
-    localStorage.setItem(termsStorageKey, "true");
+    localStorage.setItem(termsStorageKey, getLatestDownloadKey());
   } catch {
     // Ignore storage failures; the download page will keep the gate closed.
   }
@@ -44,6 +45,61 @@ const checkDownloadFile = async (url) => {
   } catch {
     return false;
   }
+};
+
+const getDownloadFileNames = () =>
+  Array.isArray(window.MANU_DOWNLOAD_FILES) ? window.MANU_DOWNLOAD_FILES : [];
+
+const readDownloadDrafts = () => {
+  try {
+    const raw = localStorage.getItem(downloadStorageKey);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const getDownloads = () => readDownloadDrafts() || getDownloadFileNames();
+
+const buildDownloadDataJs = (fileNames) =>
+  `window.MANU_DOWNLOAD_FILES = ${JSON.stringify(fileNames, null, 2)};\n`;
+
+const parseVersionParts = (fileName) => {
+  const version = fileName.match(/v?(\d+(?:[._-]\d+)*)/i)?.[1] || "0";
+  return version.split(/[._-]/).map((part) => Number(part) || 0);
+};
+
+const compareVersionParts = (a, b) => {
+  const length = Math.max(a.length, b.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const diff = (b[index] || 0) - (a[index] || 0);
+
+    if (diff !== 0) {
+      return diff;
+    }
+  }
+
+  return 0;
+};
+
+const getSortedDownloadFiles = () =>
+  getDownloads()
+    .filter((fileName) => typeof fileName === "string" && fileName.trim())
+    .map((fileName) => fileName.trim())
+    .filter((fileName, index, fileNames) => fileNames.indexOf(fileName) === index)
+    .map((fileName) => ({
+      fileName,
+      href: `../downloads/${encodeURIComponent(fileName)}`,
+      versionParts: parseVersionParts(fileName)
+    }))
+    .sort((a, b) => compareVersionParts(a.versionParts, b.versionParts) || b.fileName.localeCompare(a.fileName));
+
+const getLatestDownloadKey = () => getSortedDownloadFiles()[0]?.fileName || "no-download-file";
+
+const getDownloadLabel = (fileName) => {
+  const version = fileName.match(/v?(\d+(?:[._-]\d+)*)/i)?.[0] || fileName.replace(/\.zip$/i, "");
+  return `MANU ${version.replaceAll("_", ".")} ZIP 다운로드`;
 };
 
 const getDefaultSamples = () =>
@@ -170,49 +226,95 @@ document.querySelectorAll(".site-nav a").forEach((link) => {
 
 const currentPath = window.location.pathname.replace(/\/+$/, "");
 
-if (currentPath.endsWith("/terms") || currentPath.endsWith("terms.html")) {
+if (currentPath.endsWith("/terms")) {
   markTermsVisited();
 }
 
-const gatedDownload = document.querySelector("[data-requires-terms='true']");
+const downloadList = document.querySelector("#downloadList");
 const downloadGateStatus = document.querySelector("#downloadGateStatus");
 
-if (gatedDownload && downloadGateStatus) {
-  let canDownload = false;
-  let shouldRedirectToTerms = false;
+if (downloadList && downloadGateStatus) {
+  const downloads = getSortedDownloadFiles();
+  const termsAccepted = hasVisitedTerms();
 
-  const lockDownload = (message, redirectToTerms = false) => {
-    canDownload = false;
-    shouldRedirectToTerms = redirectToTerms;
-    gatedDownload.setAttribute("aria-disabled", "true");
-    downloadGateStatus.textContent = message;
-  };
+  if (!downloads.length) {
+    downloadGateStatus.textContent = "등록된 다운로드 파일이 없습니다.";
+  } else if (!termsAccepted) {
+    downloadGateStatus.textContent =
+      "최신 버전 기준 이용 약관을 한 번 확인해야 다운로드할 수 있습니다.";
+  } else {
+    downloadGateStatus.textContent = "다운로드 파일을 확인하는 중입니다.";
+  }
 
-  const unlockDownload = (message) => {
-    canDownload = true;
-    shouldRedirectToTerms = false;
-    gatedDownload.removeAttribute("aria-disabled");
-    downloadGateStatus.textContent = message;
-  };
+  downloadList.innerHTML = downloads
+    .map(
+      (item, index) => `
+        <article class="download-item${index === 0 ? " is-latest" : ""}">
+          <div>
+            <span class="download-version">${index === 0 ? "최신 버전" : "구버전"}</span>
+            <h2>${escapeHtml(getDownloadLabel(item.fileName))}</h2>
+            <p>${escapeHtml(item.fileName)}</p>
+          </div>
+          <a
+            class="button primary"
+            href="${escapeHtml(item.href)}"
+            download
+            data-download-file="${escapeHtml(item.fileName)}"
+            aria-disabled="true"
+          >
+            다운로드
+          </a>
+        </article>
+      `
+    )
+    .join("");
 
-  gatedDownload.addEventListener("click", (event) => {
-    if (!canDownload) {
-      event.preventDefault();
-      if (shouldRedirectToTerms) {
-        window.location.href = "../terms";
+  const downloadLinks = [...downloadList.querySelectorAll("[data-download-file]")];
+  const unavailableFiles = new Set(downloads.map((item) => item.fileName));
+
+  downloadLinks.forEach((link) => {
+    link.addEventListener("click", (event) => {
+      if (!termsAccepted) {
+        event.preventDefault();
+        window.location.href = "../terms/";
+        return;
       }
-    }
+
+      if (unavailableFiles.has(link.dataset.downloadFile)) {
+        event.preventDefault();
+      }
+    });
   });
 
-  if (!hasVisitedTerms()) {
-    lockDownload("이용 약관 페이지를 한 번 확인해야 다운로드할 수 있습니다.", true);
-  } else {
-    lockDownload("다운로드 파일을 확인하는 중입니다.");
-    checkDownloadFile(gatedDownload.href).then((exists) => {
-      if (exists) {
-        unlockDownload("이용 약관 확인 기록이 있고 다운로드 파일이 준비되어 있습니다.");
+  if (termsAccepted) {
+    Promise.all(
+      downloads.map(async (item) => ({
+        ...item,
+        exists: await checkDownloadFile(item.href)
+      }))
+    ).then((checkedDownloads) => {
+      checkedDownloads.forEach((item) => {
+        const link = downloadList.querySelector(`[data-download-file="${CSS.escape(item.fileName)}"]`);
+
+        if (!link) {
+          return;
+        }
+
+        if (item.exists) {
+          unavailableFiles.delete(item.fileName);
+          link.removeAttribute("aria-disabled");
+        } else {
+          link.setAttribute("aria-disabled", "true");
+          link.textContent = "파일 없음";
+        }
+      });
+
+      if (unavailableFiles.size === checkedDownloads.length) {
+        downloadGateStatus.textContent = "다운로드 파일이 아직 업로드되지 않았습니다.";
+      } else if (unavailableFiles.size) {
+        downloadGateStatus.textContent = "일부 파일이 아직 업로드되지 않았습니다.";
       } else {
-        lockDownload("다운로드 파일이 아직 업로드되지 않았습니다.");
+        downloadGateStatus.textContent = "이용 약관 확인 기록이 있고 다운로드 파일이 준비되어 있습니다.";
       }
     });
   }
@@ -398,6 +500,206 @@ if (sampleForm) {
   clearButton.addEventListener("click", () => {
     localStorage.removeItem(sampleStorageKey);
     samples = getDefaultSamples().map((sample) => ({ ...sample }));
+    resetForm();
+    refresh();
+    setStatus("임시 저장 데이터를 삭제했습니다.");
+  });
+
+  refresh();
+}
+
+const downloadForm = document.querySelector("#downloadForm");
+
+if (downloadForm) {
+  const fileNameField = document.querySelector("#downloadFileName");
+  const bulkForm = document.querySelector("#bulkDownloadForm");
+  const bulkInput = document.querySelector("#downloadBulkInput");
+  const list = document.querySelector("#adminDownloadList");
+  const count = document.querySelector("#downloadFileCount");
+  const exportBox = document.querySelector("#downloadExport");
+  const status = document.querySelector("#downloadAdminStatus");
+  const folderButton = document.querySelector("#readDownloadFolder");
+  const folderInput = document.querySelector("#downloadFolderInput");
+  const resetButton = document.querySelector("#resetDownloadForm");
+  const copyButton = document.querySelector("#copyDownloadData");
+  const saveButton = document.querySelector("#saveDownloadData");
+  const clearButton = document.querySelector("#clearLocalDownloads");
+  let downloads = getDownloads().map((fileName) => String(fileName).trim()).filter(Boolean);
+  let editingIndex = -1;
+
+  const setStatus = (message) => {
+    status.textContent = message;
+  };
+
+  const getSortedFileNames = () =>
+    downloads
+      .filter((fileName, index, fileNames) => fileNames.indexOf(fileName) === index)
+      .sort((a, b) => compareVersionParts(parseVersionParts(a), parseVersionParts(b)) || b.localeCompare(a));
+
+  const persist = () => {
+    localStorage.setItem(downloadStorageKey, JSON.stringify(downloads));
+  };
+
+  const resetForm = () => {
+    editingIndex = -1;
+    downloadForm.reset();
+    document.querySelector("#saveDownloadFile").textContent = "파일명 추가";
+  };
+
+  const refresh = () => {
+    downloads = getSortedFileNames();
+    count.textContent = `${downloads.length}개`;
+    exportBox.value = buildDownloadDataJs(downloads);
+    list.innerHTML = downloads
+      .map(
+        (fileName, index) => `
+          <article class="admin-sample-item">
+            <div>
+              <h3>${escapeHtml(index === 0 ? "최신 버전" : "구버전")}</h3>
+              <p>${escapeHtml(fileName)}</p>
+            </div>
+            <div class="admin-item-actions">
+              <button class="button secondary" type="button" data-download-action="edit" data-index="${index}">수정</button>
+              <button class="button primary" type="button" data-download-action="delete" data-index="${index}">삭제</button>
+            </div>
+          </article>
+        `
+      )
+      .join("");
+  };
+
+  const replaceWithLocalFiles = (fileNames) => {
+    const zipFileNames = fileNames
+      .map((fileName) => fileName.split(/[\\/]/).pop().trim())
+      .filter((fileName) => fileName.toLowerCase().endsWith(".zip"));
+
+    if (!zipFileNames.length) {
+      setStatus("선택한 폴더에서 ZIP 파일을 찾지 못했습니다.");
+      return;
+    }
+
+    downloads = zipFileNames.filter(
+      (fileName, index, fileNamesList) => fileNamesList.indexOf(fileName) === index
+    );
+    persist();
+    resetForm();
+    refresh();
+    setStatus(`${downloads.length}개 ZIP 파일을 읽어 download-data.js를 생성했습니다.`);
+  };
+
+  downloadForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const fileName = fileNameField.value.trim();
+
+    if (!fileName.toLowerCase().endsWith(".zip")) {
+      setStatus("ZIP 파일명만 추가할 수 있습니다.");
+      return;
+    }
+
+    if (editingIndex >= 0) {
+      downloads[editingIndex] = fileName;
+      setStatus("파일명을 수정했습니다.");
+    } else if (!downloads.includes(fileName)) {
+      downloads.push(fileName);
+      setStatus("파일명을 추가했습니다.");
+    } else {
+      setStatus("이미 등록된 파일명입니다.");
+    }
+
+    persist();
+    resetForm();
+    refresh();
+  });
+
+  bulkForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const fileNames = bulkInput.value
+      .split(/\r?\n/)
+      .map((fileName) => fileName.trim())
+      .filter((fileName) => fileName.toLowerCase().endsWith(".zip"));
+
+    downloads = [...downloads, ...fileNames].filter(
+      (fileName, index, fileNamesList) => fileNamesList.indexOf(fileName) === index
+    );
+    bulkForm.reset();
+    persist();
+    refresh();
+    setStatus(`${fileNames.length}개 파일명을 목록에 반영했습니다.`);
+  });
+
+  folderButton.addEventListener("click", async () => {
+    if ("showDirectoryPicker" in window) {
+      try {
+        const directoryHandle = await window.showDirectoryPicker();
+        const fileNames = [];
+
+        for await (const entry of directoryHandle.values()) {
+          if (entry.kind === "file") {
+            fileNames.push(entry.name);
+          }
+        }
+
+        replaceWithLocalFiles(fileNames);
+      } catch {
+        setStatus("폴더 읽기를 취소했습니다.");
+      }
+      return;
+    }
+
+    folderInput.click();
+  });
+
+  folderInput.addEventListener("change", () => {
+    replaceWithLocalFiles([...folderInput.files].map((file) => file.name));
+    folderInput.value = "";
+  });
+
+  resetButton.addEventListener("click", resetForm);
+
+  list.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-download-action]");
+
+    if (!button) {
+      return;
+    }
+
+    const index = Number(button.dataset.index);
+    const action = button.dataset.downloadAction;
+
+    if (action === "edit") {
+      editingIndex = index;
+      fileNameField.value = downloads[index];
+      document.querySelector("#saveDownloadFile").textContent = "파일명 수정";
+      setStatus("수정할 파일명을 불러왔습니다.");
+      return;
+    }
+
+    if (action === "delete") {
+      downloads.splice(index, 1);
+      persist();
+      resetForm();
+      refresh();
+      setStatus("파일명을 삭제했습니다.");
+    }
+  });
+
+  copyButton.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(exportBox.value);
+    setStatus("download-data.js 내용을 복사했습니다.");
+  });
+
+  saveButton.addEventListener("click", async () => {
+    try {
+      await downloadTextFile("download-data.js", exportBox.value);
+      setStatus("download-data.js 파일을 저장했습니다.");
+    } catch {
+      setStatus("파일 저장을 취소했습니다.");
+    }
+  });
+
+  clearButton.addEventListener("click", () => {
+    localStorage.removeItem(downloadStorageKey);
+    downloads = getDownloadFileNames().map((fileName) => String(fileName).trim()).filter(Boolean);
     resetForm();
     refresh();
     setStatus("임시 저장 데이터를 삭제했습니다.");

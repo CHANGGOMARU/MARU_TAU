@@ -486,6 +486,64 @@ h3 {
   margin: 0;
 }
 
+.download-list-panel {
+  display: grid;
+  gap: 14px;
+  justify-content: stretch;
+}
+
+.download-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.download-list {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.download-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.download-item h2 {
+  margin: 4px 0;
+  font-size: 1.04rem;
+}
+
+.download-item p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.download-version {
+  display: inline-flex;
+  color: var(--teal-deep);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.download-item.is-latest {
+  border-color: rgba(24, 124, 131, 0.42);
+}
+
+.download-item .button[aria-disabled="true"] {
+  pointer-events: auto;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .download-gate {
   flex-basis: 100%;
   max-width: none;
@@ -671,6 +729,18 @@ pre {
   resize: vertical;
 }
 
+.file-picker-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.file-picker-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .admin-panel-heading {
   display: flex;
   align-items: center;
@@ -764,6 +834,10 @@ pre {
     justify-content: flex-start;
   }
 
+  .download-toolbar {
+    justify-content: flex-start;
+  }
+
   .spec-list {
     grid-template-columns: 1fr;
   }
@@ -786,6 +860,10 @@ pre {
   .download-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .download-item {
+    grid-template-columns: 1fr;
   }
 
   .button {
