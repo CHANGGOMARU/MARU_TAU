@@ -168,7 +168,9 @@ document.querySelectorAll(".site-nav a").forEach((link) => {
   });
 });
 
-if (window.location.pathname.endsWith("terms.html")) {
+const currentPath = window.location.pathname.replace(/\/+$/, "");
+
+if (currentPath.endsWith("/terms") || currentPath.endsWith("terms.html")) {
   markTermsVisited();
 }
 
@@ -197,7 +199,7 @@ if (gatedDownload && downloadGateStatus) {
     if (!canDownload) {
       event.preventDefault();
       if (shouldRedirectToTerms) {
-        window.location.href = "terms.html";
+        window.location.href = "../terms";
       }
     }
   });
