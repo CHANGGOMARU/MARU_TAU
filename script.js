@@ -64,6 +64,74 @@ const getDownloads = () => readDownloadDrafts() || getDownloadFileNames();
 const buildDownloadDataJs = (fileNames) =>
   `window.MANU_DOWNLOAD_FILES = ${JSON.stringify(fileNames, null, 2)};\n`;
 
+const getUiLanguage = () => {
+  const language = document.documentElement.lang.toLowerCase();
+
+  if (language.startsWith("ja")) {
+    return "ja";
+  }
+
+  if (language.startsWith("en")) {
+    return "en";
+  }
+
+  return "ko";
+};
+
+const downloadMessages = {
+  ko: {
+    noFiles: "등록된 다운로드 파일이 없습니다.",
+    needTerms: "최신 버전 기준 이용 약관을 한 번 확인해야 다운로드할 수 있습니다.",
+    checking: "다운로드 파일을 확인하는 중입니다.",
+    latest: "최신 버전",
+    old: "구버전",
+    download: "다운로드",
+    missing: "파일 없음",
+    allMissing: "다운로드 파일이 아직 업로드되지 않았습니다.",
+    someMissing: "일부 파일이 아직 업로드되지 않았습니다.",
+    ready: "이용 약관 확인 기록이 있고 다운로드 파일이 준비되어 있습니다."
+  },
+  en: {
+    noFiles: "No download files are registered.",
+    needTerms: "Please view the terms once for the latest version before downloading.",
+    checking: "Checking download files.",
+    latest: "Latest version",
+    old: "Old version",
+    download: "Download",
+    missing: "File missing",
+    allMissing: "The download files have not been uploaded yet.",
+    someMissing: "Some files have not been uploaded yet.",
+    ready: "The terms visit is recorded and the download files are ready."
+  },
+  ja: {
+    noFiles: "登録されたダウンロードファイルがありません。",
+    needTerms: "最新版の利用規約を一度確認するとダウンロードできます。",
+    checking: "ダウンロードファイルを確認しています。",
+    latest: "最新版",
+    old: "旧バージョン",
+    download: "ダウンロード",
+    missing: "ファイルなし",
+    allMissing: "ダウンロードファイルはまだアップロードされていません。",
+    someMissing: "一部のファイルはまだアップロードされていません。",
+    ready: "利用規約の確認記録があり、ダウンロードファイルの準備ができています。"
+  }
+};
+
+const copyMessages = {
+  ko: {
+    copied: "크레딧을 복사했습니다.",
+    failed: "복사에 실패했습니다. 텍스트를 직접 선택해 주세요."
+  },
+  en: {
+    copied: "Credit copied.",
+    failed: "Copy failed. Please select the text manually."
+  },
+  ja: {
+    copied: "クレジットをコピーしました。",
+    failed: "コピーに失敗しました。テキストを直接選択してください。"
+  }
+};
+
 const parseVersionParts = (fileName) => {
   const version = fileName.match(/v?(\d+(?:[._-]\d+)*)/i)?.[1] || "0";
   return version.split(/[._-]/).map((part) => Number(part) || 0);
@@ -90,7 +158,7 @@ const getSortedDownloadFiles = () =>
     .filter((fileName, index, fileNames) => fileNames.indexOf(fileName) === index)
     .map((fileName) => ({
       fileName,
-      href: `../downloads/${encodeURIComponent(fileName)}`,
+      href: `${document.querySelector("#downloadList")?.dataset.downloadBase || "../downloads/"}${encodeURIComponent(fileName)}`,
       versionParts: parseVersionParts(fileName)
     }))
     .sort((a, b) => compareVersionParts(a.versionParts, b.versionParts) || b.fileName.localeCompare(a.fileName));
@@ -236,14 +304,14 @@ const downloadGateStatus = document.querySelector("#downloadGateStatus");
 if (downloadList && downloadGateStatus) {
   const downloads = getSortedDownloadFiles();
   const termsAccepted = hasVisitedTerms();
+  const messages = downloadMessages[getUiLanguage()];
 
   if (!downloads.length) {
-    downloadGateStatus.textContent = "등록된 다운로드 파일이 없습니다.";
+    downloadGateStatus.textContent = messages.noFiles;
   } else if (!termsAccepted) {
-    downloadGateStatus.textContent =
-      "최신 버전 기준 이용 약관을 한 번 확인해야 다운로드할 수 있습니다.";
+    downloadGateStatus.textContent = messages.needTerms;
   } else {
-    downloadGateStatus.textContent = "다운로드 파일을 확인하는 중입니다.";
+    downloadGateStatus.textContent = messages.checking;
   }
 
   downloadList.innerHTML = downloads
@@ -251,7 +319,7 @@ if (downloadList && downloadGateStatus) {
       (item, index) => `
         <article class="download-item${index === 0 ? " is-latest" : ""}">
           <div>
-            <span class="download-version">${index === 0 ? "최신 버전" : "구버전"}</span>
+            <span class="download-version">${index === 0 ? messages.latest : messages.old}</span>
             <h2>${escapeHtml(getDownloadLabel(item.fileName))}</h2>
             <p>${escapeHtml(item.fileName)}</p>
           </div>
@@ -262,7 +330,7 @@ if (downloadList && downloadGateStatus) {
             data-download-file="${escapeHtml(item.fileName)}"
             aria-disabled="true"
           >
-            다운로드
+            ${messages.download}
           </a>
         </article>
       `
@@ -305,16 +373,16 @@ if (downloadList && downloadGateStatus) {
           link.removeAttribute("aria-disabled");
         } else {
           link.setAttribute("aria-disabled", "true");
-          link.textContent = "파일 없음";
+          link.textContent = messages.missing;
         }
       });
 
       if (unavailableFiles.size === checkedDownloads.length) {
-        downloadGateStatus.textContent = "다운로드 파일이 아직 업로드되지 않았습니다.";
+        downloadGateStatus.textContent = messages.allMissing;
       } else if (unavailableFiles.size) {
-        downloadGateStatus.textContent = "일부 파일이 아직 업로드되지 않았습니다.";
+        downloadGateStatus.textContent = messages.someMissing;
       } else {
-        downloadGateStatus.textContent = "이용 약관 확인 기록이 있고 다운로드 파일이 준비되어 있습니다.";
+        downloadGateStatus.textContent = messages.ready;
       }
     });
   }
@@ -322,11 +390,13 @@ if (downloadList && downloadGateStatus) {
 
 if (copyButton && creditText && copyStatus) {
   copyButton.addEventListener("click", async () => {
+    const messages = copyMessages[getUiLanguage()];
+
     try {
       await navigator.clipboard.writeText(creditText.textContent.trim());
-      copyStatus.textContent = "크레딧을 복사했습니다.";
+      copyStatus.textContent = messages.copied;
     } catch {
-      copyStatus.textContent = "복사에 실패했습니다. 텍스트를 직접 선택해 주세요.";
+      copyStatus.textContent = messages.failed;
     }
   });
 }
